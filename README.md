@@ -8,6 +8,7 @@
 
 ## WordPress, Nginx PHP-FPM
 Run the playbook as follows:
-	ansible-playbook wp_nginx.yml
+	
+    ansible-playbook wp_nginx.yml
 
 You should be able to view your WordPress site online at: http://your_server_ip.
