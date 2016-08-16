@@ -30,9 +30,6 @@
         - php5-mysql
         - mysql-server        
 
-    - name: create directories for ssl certificates
-      file: path=/etc/nginx/ssl state=directory
-
     - name: copy nginx config file
       template: src=templates/nginx.conf.j2 dest={{ conf_file }}
       notify: 
