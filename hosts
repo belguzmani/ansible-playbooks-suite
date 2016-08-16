@@ -1,5 +1,5 @@
 [aws]
-ubuntu-ami ansible_ssh_host=<your server ip> ansible_ssh_user=ubuntu ansible_ssh_private_key_file=<your pem file's location>
+ubuntu-ami ansible_ssh_host=54.183.229.81 ansible_ssh_user=ubuntu ansible_ssh_private_key_file=/Users/adbeel/.ssh/adbeel_ubuntu.pem
 
 [digitalocean]
 ubuntu-droplet
