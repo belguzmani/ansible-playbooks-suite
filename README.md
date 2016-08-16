@@ -6,9 +6,14 @@
 * Change the values ansible_ssh_host and ansible_ssh_private_key_file on hosts file.
 * Copy secrets_sample.yml to secret.yml and specify your secret keys.
 
-## WordPress, Nginx PHP-FPM
+## WordPress, Nginx and PHP-FPM
 Run the playbook as follows:
 	
     ansible-playbook wp_nginx.yml
 
+## WordPress and Apache
+Coming soon...
+
 You should be able to view your WordPress site online at: http://your_server_ip.
+
+

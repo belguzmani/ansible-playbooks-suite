@@ -5,8 +5,6 @@
   hosts: ubuntu
   sudo: True
   vars:
-    key_file: /etc/nginx/ssl/nginx.key
-    cert_file: /etc/nginx/ssl/nginx.crt
     conf_file: /etc/nginx/sites-available/default
     server_name: localhost
     wp_mysql_db: wordpress
@@ -34,14 +32,6 @@
 
     - name: create directories for ssl certificates
       file: path=/etc/nginx/ssl state=directory
-
-    - name: copy tls key
-      copy: src=files/nginx.key dest={{ key_file }} owner=root mode=0600
-      notify: restart nginx
-
-    - name: copy tls certificate
-      copy: src=files/nginx.crt dest={{ cert_file }}
-      notify: restart nginx
 
     - name: copy nginx config file
       template: src=templates/nginx.conf.j2 dest={{ conf_file }}
