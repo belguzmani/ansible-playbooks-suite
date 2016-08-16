@@ -14,6 +14,7 @@ Run the playbook as follows:
 ## WordPress and Apache
 Coming soon...
 
+## Done
 You should be able to view your WordPress site online at: http://your_server_ip.
 
 
