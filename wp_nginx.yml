@@ -1,0 +1,133 @@
+#!/usr/bin/env ansible-playbook
+---
+
+- name: Install Wordpress on Ubuntu
+  hosts: ubuntu
+  sudo: True
+  vars:
+    key_file: /etc/nginx/ssl/nginx.key
+    cert_file: /etc/nginx/ssl/nginx.crt
+    conf_file: /etc/nginx/sites-available/default
+    server_name: localhost
+    wp_mysql_db: wordpress
+    wp_mysql_user: deploy
+  vars_files:
+     - secrets.yml    
+  tasks:
+    - name: Confirm MySQL root password before installing
+      debconf: "name='mysql-server' question='mysql-server/root_password_again' value='{{mysql_root_password | quote}}' vtype='password'"
+
+    - name: Install packages
+      apt: pkg={{ item }} update_cache=yes cache_valid_time=3600
+      with_items:
+        - git
+        - mcrypt
+        - nginx
+        - php5-cli
+        - php5-curl
+        - php5-fpm
+        - php5-intl
+        - php5-json
+        - php5-mcrypt
+        - php5-mysql
+        - mysql-server        
+
+    - name: create directories for ssl certificates
+      file: path=/etc/nginx/ssl state=directory
+
+    - name: copy tls key
+      copy: src=files/nginx.key dest={{ key_file }} owner=root mode=0600
+      notify: restart nginx
+
+    - name: copy tls certificate
+      copy: src=files/nginx.crt dest={{ cert_file }}
+      notify: restart nginx
+
+    - name: copy nginx config file
+      template: src=templates/nginx.conf.j2 dest={{ conf_file }}
+      notify: 
+        - restart php5-fpm
+        - restart nginx
+
+    - name: enable configuration
+      file: >
+        dest=/etc/nginx/sites-enabled/default
+        src={{ conf_file }}
+        state=link
+      notify: restart nginx
+
+    - name: copy index.html
+      template: >
+        src=templates/index.html.j2
+        dest=/usr/share/nginx/html.index.html
+        mode=0644
+    
+    - name: Start MySQL service
+      service: name=mysql state=started
+
+    - name: Ensure anonymous users are not in the database
+      mysql_user: user='' host=$item state=absent login_password="{{ mysql_root_password }}" login_user=root
+      with_items:
+        - 127.0.0.1
+        - ::1
+        - localhost
+
+    - name: Create deploy user for mysql
+      mysql_user: user="deploy" host="%" password={{mysql_root_password}} priv=*.*:ALL,GRANT login_password="{{ mysql_root_password }}" login_user=root
+
+    - name: Copy .my.cnf file with root password credentials
+      template: src=templates/my.cnf.j2 dest=/etc/mysql/my.cnf owner=root mode=0600      
+
+    - name: (TO-REVIEW) Update mysql root password for all root accounts
+      mysql_user: name=root host={{item}} password={{mysql_root_password}} login_password="{{ mysql_root_password }}" login_user=root
+      with_items:
+        - 127.0.0.1
+        - ::1
+        - localhost
+
+    - name: Create mysql database
+      mysql_db: name={{ wp_mysql_db }} state=present login_password="{{ mysql_root_password }}" login_user=deploy
+
+    - name: ensure php5-fpm cgi.fix_pathinfo=0 
+      lineinfile: dest=/etc/php5/fpm/php.ini regexp='^(.*)cgi.fix_pathinfo=' line=cgi.fix_pathinfo=0
+      notify: 
+        - restart php5-fpm
+        - restart nginx
+
+    - name: enable php5 mcrypt module
+      shell: php5enmod mcrypt
+      args:
+        creates: /etc/php5/cli/conf.d/20-mcrypt.ini
+
+    - name: create /var/www/ directory
+      file: dest=/var/www/ state=directory owner=www-data group=www-data mode=0700
+
+    - name: Download WordPress
+      get_url: >
+        url="https://wordpress.org/latest.tar.gz" 
+        dest=/tmp/wordpress.tar.gz
+        validate_certs=no 
+
+    - name: Extract WordPress  
+      unarchive: src=/tmp/wordpress.tar.gz dest=/var/www/ copy=no
+
+    - name: Copy sample config file
+      command: mv /var/www/wordpress/wp-config-sample.php /var/www/wordpress/wp-config.php creates=/var/www/wordpress/wp-config.php
+ 
+    - name: Update WordPress config file
+      lineinfile: >
+        dest=/var/www/wordpress/wp-config.php
+        regexp="{{ item.regexp }}"
+        line="{{ item.line }}"
+      with_items:
+        - {'regexp': "define\\('DB_NAME', '(.)+'\\);", 'line': "define('DB_NAME', '{{wp_mysql_db}}');"}        
+        - {'regexp': "define\\('DB_USER', '(.)+'\\);", 'line': "define('DB_USER', '{{wp_mysql_user}}');"}        
+        - {'regexp': "define\\('DB_PASSWORD', '(.)+'\\);", 'line': "define('DB_PASSWORD', '{{mysql_root_password}}');"}
+      sudo: yes   
+      
+  handlers:
+    - name: restart php5-fpm
+      service: name=php5-fpm state=restarted
+
+    - name: restart nginx
+      service: name=nginx state=restarted
