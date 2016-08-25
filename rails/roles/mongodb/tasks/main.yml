@@ -1,0 +1,37 @@
+- name: Add MongoDb repository
+  sudo: True
+  apt_key:
+    keyserver: keyserver.ubuntu.com
+    id: EA312927
+    state: present
+
+# - name: Add apt HTTPS capabilities.
+#   sudo: True
+#   apt: name=apt-transport-https state=present
+
+- name: Add MongoDB apt repo.
+  sudo: True
+  apt_repository:
+    repo: 'deb http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse'
+    state: present
+    update_cache: yes
+
+- name: Install MongoDB
+  sudo: True
+  apt: pkg=mongodb-org update_cache=yes cache_valid_time=3600
+
+- name: copy MongoDB service file
+  sudo: True
+  copy: src=files/mongodb.service dest={{ mongodb_service_file }}
+  notify: restart mongodb
+
+# this one is availanle on ansible 2.2
+# - systemd: state=started name=mongodb enabled=yes
+
+- name: Start MongoDB service
+  command: systemctl start mongodb
+  sudo: True
+
+- name: Enable MongoDB service
+  command: systemctl enable mongodb
+  sudo: True
