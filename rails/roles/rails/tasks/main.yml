@@ -1,0 +1,31 @@
+
+- name: Create directory .apps
+  file: dest=/home/{{ ansible_ssh_user }}/.apps state=directory
+
+- name: Clone Rails project  
+  git: > 
+    repo={{ git_repo }} dest=/home/{{ ansible_ssh_user }}/.apps/{{ app_name }}
+    force=yes
+  notify: restart nginx
+
+# NOTICE: Already installed with rvm
+# - name: Install Bundler
+#   gem: name=bundler state=latest
+
+- name: Bundle install
+  command: 'bash -lc "bundle install"'
+  args:
+    chdir: '{{ app_location }}'
+
+- debug: var=app_location
+
+- name: Copy sample secrets file
+  command: cp {{ app_location }}/config/secrets_sample.yml {{ app_location }}/config/secrets.yml 
+  notify: restart nginx
+
+- name: Precompile assets
+  shell: bash -lc "bundle exec rake assets:precompile"
+  args:
+    chdir: "{{ app_location }}"
+  environment:
+    RAILS_ENV: production    

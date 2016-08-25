@@ -1,0 +1,92 @@
+#!/usr/bin/env ansible-playbook
+---
+
+- name: Install Rails Nginx And MongoDB on Ubuntu 16.04
+  hosts: rails
+  vars: 
+    conf_file: /etc/nginx/sites-available/default
+    passenger_file: /etc/nginx/passenger.conf
+    ruby_version: ruby-2.2.4    
+    app_location: /home/{{ ansible_ssh_user }}/.apps/{{ app_name }}
+  vars_files:
+    - secrets.yml
+  pre_tasks:
+
+    # Passenger repository setup.
+    - name: Add Passenger apt key.
+      sudo: True
+      apt_key:
+        keyserver: keyserver.ubuntu.com
+        id: 561F9B9CAC40B2F7
+        state: present
+
+    - name: Add apt HTTPS capabilities.
+      sudo: True
+      apt: name=apt-transport-https state=present
+
+    - name: Add Phusion apt repo.
+      sudo: True
+      apt_repository:
+        repo: 'deb https://oss-binaries.phusionpassenger.com/apt/passenger {{ansible_distribution_release}} main'
+        state: present
+        update_cache: yes
+        
+    - name: Install packages
+      sudo: True
+      apt: pkg={{ item }} update_cache=yes cache_valid_time=3600
+      with_items:
+        - build-essential 
+        - libssl-dev 
+        - libyaml-dev 
+        - libreadline-dev 
+        - openssl 
+        - curl 
+        - git-core 
+        - zlib1g-dev 
+        - bison 
+        - libxml2-dev 
+        - libxslt1-dev 
+        - libcurl4-openssl-dev 
+        - nodejs 
+        - libsqlite3-dev 
+        - sqlite3
+        - nginx-extras 
+        - passenger
+    
+    - name: Enable passenger on nginx
+      sudo: True
+      lineinfile: dest=/etc/nginx/nginx.conf regexp='^(.*)include /etc/nginx/passenger.conf;' line='include /etc/nginx/passenger.conf;'      
+      notify: 
+        - restart nginx
+
+    - name: copy nginx config file
+      sudo: True
+      template: src=templates/nginx.conf.j2 dest={{ conf_file }}
+      notify: 
+        - restart nginx
+
+    - name: copy passenger config file
+      sudo: True
+      template: src=templates/passenger.conf.j2 dest={{ passenger_file }}
+      notify:
+        - restart nginx
+
+  roles: 
+    - role: rvm_io.rvm1-ruby
+      sudo: True
+      rvm1_user: '{{ ansible_ssh_user }}'
+      rvm1_rvm_version: 'stable'      
+      rvm1_install_flags: '--auto-dotfiles --user-install'
+      rvm1_install_path: '/home/{{ ansible_ssh_user }}/.rvm'
+      rvm1_rvm_check_for_updates: True
+      rvm1_rubies:
+        - '{{ ruby_version }}'
+
+    - rails
+
+    - mongodb
+          
+  handlers:
+    - name: restart nginx
+      sudo: True
+      service: name=nginx state=restarted
